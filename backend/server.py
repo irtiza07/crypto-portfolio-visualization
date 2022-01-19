@@ -1,4 +1,4 @@
-# Requirements: 
+# Requirements:
 # ! Log all crypto purchases & sells (coin, no_coins, cost, coin_price_at_purchase, timestamp)
 # ! Total cost, total equity, Total Gain/Losee, % Gain Loss
 # ! Proportion of coin values in portfolio (pie chart)
@@ -10,6 +10,8 @@ from collections import defaultdict
 from datetime import datetime
 from psycopg2 import pool
 from flask import Flask, request, jsonify
+from flask_cors import CORS, cross_origin
+
 from logic import BOUGHT, SOLD
 from logic import format_db_row_to_transaction
 
@@ -26,13 +28,18 @@ postgreSQL_pool = pool.SimpleConnectionPool(
 )
 
 app = Flask(__name__)
+cors = CORS(app)
+
 app.config['postgreSQL_pool'] = postgreSQL_pool
+
 
 @app.route("/")
 def health_check():
     return "I am cool!"
 
+
 @app.route("/transactions")
+@cross_origin()
 def get_transactions():
     cur = postgreSQL_pool.getconn().cursor()
     cur.execute("SELECT * FROM transaction")
@@ -43,6 +50,7 @@ def get_transactions():
             for row in rows
         ]
     )
+
 
 @app.route("/transactions", methods=["POST"])
 def new_transaction():
@@ -68,7 +76,14 @@ def new_transaction():
 
 @app.route("/get_rollups_by_coin")
 def get_rollups_by_coin():
-    portfolio = defaultdict(lambda: {"coins": 0, "total_cost": 0, "total_equity": 0, "live_price": 0 })
+    portfolio = defaultdict(
+        lambda: {
+            "coins": 0,
+            "total_cost": 0,
+            "total_equity": 0,
+            "live_price": 0
+        }
+    )
 
     conn = postgreSQL_pool.getconn()
     cur = conn.cursor()
@@ -90,23 +105,22 @@ def get_rollups_by_coin():
             # This is a sell
             portfolio[coin]['total_cost'] -= transaction_amount
             portfolio[coin]['coins'] -= transaction_coins
-    
+
     symbol_to_coin_id_map = {
         "BTC": "bitcoin",
         "SOL": "solana"
     }
     for symbol in portfolio:
-        #TODO: Replace with API call to CoinGecko
-        response = requests.get(f"{LIVE_PRICE_URL}?ids={symbol_to_coin_id_map[symbol]}&vs_currencies=usd").json()
+        # TODO: Replace with API call to CoinGecko
+        response = requests.get(
+            f"{LIVE_PRICE_URL}?ids={symbol_to_coin_id_map[symbol]}&vs_currencies=usd").json()
         live_price = response[symbol_to_coin_id_map[symbol]]['usd']
-        
+
         portfolio[symbol]['live_price'] = live_price
-        portfolio[symbol]['total_equity'] = float(portfolio[symbol]['coins']) * live_price
-    
+        portfolio[symbol]['total_equity'] = float(
+            portfolio[symbol]['coins']) * live_price
+
     return jsonify(portfolio)
-
-
-
 
 
 app.run(debug=True, port=5000)
