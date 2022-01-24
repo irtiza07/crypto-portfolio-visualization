@@ -108,10 +108,14 @@ def get_rollups_by_coin():
 
     symbol_to_coin_id_map = {
         "BTC": "bitcoin",
-        "SOL": "solana"
+        "SOL": "solana",
+        "LINK": "chainlink",
+        "ETH": "ethereum",
+        "ADA": "cardano",
+        "MANA": "decentraland",
     }
+    rollups_response = []
     for symbol in portfolio:
-        # TODO: Replace with API call to CoinGecko
         response = requests.get(
             f"{LIVE_PRICE_URL}?ids={symbol_to_coin_id_map[symbol]}&vs_currencies=usd").json()
         live_price = response[symbol_to_coin_id_map[symbol]]['usd']
@@ -120,7 +124,16 @@ def get_rollups_by_coin():
         portfolio[symbol]['total_equity'] = float(
             portfolio[symbol]['coins']) * live_price
 
-    return jsonify(portfolio)
+        rollups_response.append(
+            {
+                "symbol": symbol,
+                "live_price": portfolio[symbol]['live_price'],
+                "total_equity": portfolio[symbol]['total_equity'],
+                "coins": portfolio[symbol]['coins'],
+                "total_cost": portfolio[symbol]["total_cost"]
+            }
+        )
+    return jsonify(rollups_response)
 
 
 app.run(debug=True, port=5000)
